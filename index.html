@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<title>가계부</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #111827; --sub: #6b7280; --line: #e5e7eb;
+    --out: #e11d48; --in: #059669; --accent: #2563eb; --key: #eef0f3; --keyon: #dfe3e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --sub: #94a3b8; --line: #334155;
+      --out: #fb7185; --in: #34d399; --accent: #60a5fa; --key: #273449; --keyon: #334760;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "SamsungOne", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    display: flex; flex-direction: column; overscroll-behavior: none;
+    padding-top: env(safe-area-inset-top);
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  main { flex: 1; overflow-y: auto; }
+  .view { display: none; padding: 12px 16px 20px; }
+  .view.on { display: block; }
+  #v-add.on { display: flex; flex-direction: column; height: 100%; padding-bottom: 8px; }
+
+  /* 입력 화면 */
+  .seg { display: flex; background: var(--key); border-radius: 12px; padding: 4px; }
+  .seg button { flex: 1; padding: 10px; border-radius: 9px; font-weight: 600; color: var(--sub); }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .seg button.on[data-t="out"] { color: var(--out); }
+  .seg button.on[data-t="in"] { color: var(--in); }
+  .amount { text-align: right; font-size: 44px; font-weight: 700; padding: 14px 4px 2px; letter-spacing: -1px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .amount small { font-size: 22px; font-weight: 600; margin-left: 4px; color: var(--sub); }
+  .amount.zero { color: var(--sub); }
+  .meta { display: flex; gap: 8px; margin: 6px 0 10px; }
+  .meta input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+                background: var(--card); color: var(--text); font: inherit; font-size: 15px; }
+  .meta input[type=date] { flex: 0 0 140px; }
+  .cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .cats button { padding: 8px 2px; border-radius: 10px; background: var(--card); border: 1px solid var(--line);
+                 font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cats button span { font-size: 20px; }
+  .cats button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--card)); font-weight: 600; }
+  .pad { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pad button { height: 54px; border-radius: 12px; background: var(--key); font-size: 24px; font-weight: 500; }
+  .pad button:active { background: var(--keyon); }
+  .save { margin-top: 8px; width: 100%; height: 56px; border-radius: 14px; color: #fff; font-size: 18px; font-weight: 700;
+          background: var(--out); }
+  .save.in { background: var(--in); }
+  .save:disabled { opacity: .4; }
+
+  /* 공통 카드 */
+  .monthbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .monthbar h2 { margin: 0; font-size: 20px; }
+  .monthbar button { width: 40px; height: 40px; border-radius: 20px; font-size: 20px; background: var(--card); }
+  .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .sum div { background: var(--card); border-radius: 12px; padding: 10px; }
+  .sum label { display: block; font-size: 12px; color: var(--sub); }
+  .sum b { font-size: 15px; display: block; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-out { color: var(--out); } .c-in { color: var(--in); }
+  .day { margin-bottom: 12px; }
+  .day h3 { font-size: 13px; color: var(--sub); margin: 0 0 6px; display: flex; justify-content: space-between; font-weight: 600; }
+  .list { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); width: 100%; text-align: left; }
+  .row:last-child { border-bottom: 0; }
+  .row .ic { font-size: 22px; width: 32px; text-align: center; }
+  .row .tx { flex: 1; min-width: 0; }
+  .row .tx div { font-weight: 600; }
+  .row .tx small { color: var(--sub); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .amt { font-weight: 700; white-space: nowrap; }
+  .empty { text-align: center; color: var(--sub); padding: 40px 0; }
+
+  /* 통계 */
+  .bars { background: var(--card); border-radius: 12px; padding: 12px; }
+  .bar { margin-bottom: 12px; }
+  .bar:last-child { margin-bottom: 0; }
+  .bar .top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  .bar .track { height: 10px; background: var(--key); border-radius: 5px; overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--out); border-radius: 5px; }
+  .section-title { font-size: 14px; color: var(--sub); margin: 16px 0 8px; font-weight: 600; }
+  .tools { display: grid; gap: 8px; }
+  .tools button, .tools label { background: var(--card); border-radius: 12px; padding: 14px; text-align: left; font-size: 15px; display: block; }
+
+  /* 하단 탭 */
+  nav { display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; padding: 8px 0 10px; font-size: 12px; color: var(--sub); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  nav button span { font-size: 22px; }
+  nav button.on { color: var(--accent); font-weight: 700; }
+
+  /* 수정 시트 */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-end; z-index: 10; }
+  .sheet-bg.on { display: flex; }
+  .sheet { background: var(--card); width: 100%; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .sheet h4 { margin: 0 0 4px; font-size: 18px; }
+  .sheet p { margin: 0 0 16px; color: var(--sub); }
+  .sheet .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sheet .btns button { padding: 14px; border-radius: 12px; background: var(--key); font-weight: 600; }
+  .sheet .btns .del { background: var(--out); color: #fff; }
+
+  /* 폴드 펼친 화면·태블릿: 왼쪽 입력 + 오른쪽 내역/통계 */
+  @media (min-width: 700px) {
+    main { display: grid; grid-template-columns: minmax(340px, 420px) 1fr; min-height: 0; overflow: hidden;
+           width: 100%; max-width: 1200px; margin: 0 auto; }
+    .view { grid-row: 1; height: 100%; overflow-y: auto; }
+    #v-add, #v-add.on { display: flex; flex-direction: column; grid-column: 1; padding-bottom: 12px;
+                        border-right: 1px solid var(--line); }
+    #v-list, #v-stat { grid-column: 2; padding: 12px 24px 20px; }
+    nav button[data-v="add"] { display: none; }
+    .pad button { height: 60px; }
+    .sum b { font-size: 18px; }
+  }
+
+  .toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); transform: translateX(-50%); background: #111827; color: #fff;
+           padding: 10px 18px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+  .toast.on { opacity: .92; }
+</style>
+</head>
+<body>
+<main>
+  <!-- 입력 -->
+  <section class="view on" id="v-add">
+    <div class="seg" id="typeSeg">
+      <button data-t="out" class="on">지출</button>
+      <button data-t="in">수입</button>
+    </div>
+    <div class="amount zero" id="amount">0<small>원</small></div>
+    <div class="meta">
+      <input type="date" id="date">
+      <input type="text" id="memo" placeholder="메모 (선택)" maxlength="40" enterkeyhint="done">
+    </div>
+    <div class="cats" id="cats"></div>
+    <div class="pad" id="pad">
+      <button>1</button><button>2</button><button>3</button>
+      <button>4</button><button>5</button><button>6</button>
+      <button>7</button><button>8</button><button>9</button>
+      <button>00</button><button>0</button><button data-k="back">⌫</button>
+    </div>
+    <button class="save" id="save" disabled>저장</button>
+  </section>
+
+  <!-- 내역 -->
+  <section class="view" id="v-list">
+    <div class="monthbar"><button data-m="-1">‹</button><h2 class="mlabel"></h2><button data-m="1">›</button></div>
+    <div class="sum" id="sum"></div>
+    <div id="days"></div>
+  </section>
+
+  <!-- 통계 -->
+  <section class="view" id="v-stat">
+    <div class="monthbar"><button data-m="-1">‹</button><h2 class="mlabel"></h2><button data-m="1">›</button></div>
+    <div class="section-title">카테고리별 지출</div>
+    <div class="bars" id="bars"></div>
+    <div class="section-title">백업</div>
+    <div class="tools">
+      <button id="exportBtn">📤 백업 파일 저장 (JSON)</button>
+      <label>📥 백업 파일 불러오기<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+      <button id="csvBtn">📄 이번 달 CSV 내보내기</button>
+    </div>
+  </section>
+</main>
+
+<nav id="nav">
+  <button data-v="add" class="on"><span>✏️</span>입력</button>
+  <button data-v="list"><span>📋</span>내역</button>
+  <button data-v="stat"><span>📊</span>통계</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet">
+    <h4 id="sheetTitle"></h4>
+    <p id="sheetSub"></p>
+    <div class="btns">
+      <button id="editBtn">수정</button>
+      <button id="delBtn" class="del">삭제</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CATS = {
+  out: [['식비','🍚'],['카페','☕'],['교통','🚌'],['쇼핑','🛍️'],['생활','🏠'],['통신','📱'],['의료','💊'],['기타','📦']],
+  in:  [['월급','💰'],['용돈','🎁'],['부수입','💼'],['환급','↩️'],['이자','🏦'],['기타','📦']],
+};
+const KEY = 'gagyebu.v1';
+const $ = s => document.querySelector(s);
+
+let items = load();
+let type = 'out', amount = '', cat = CATS.out[0][0], editId = null, sheetId = null;
+let month = ym(new Date());
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; }
+}
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(items)); }
+  catch { toast('저장 공간 오류 — 백업을 해주세요'); }
+}
+function ym(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function today() {
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+const won = n => n.toLocaleString('ko-KR');
+const icon = (t, c) => (CATS[t].find(x => x[0] === c) || ['', '📦'])[1];
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 1600);
+}
+
+/* ---------- 입력 ---------- */
+function renderAdd() {
+  document.querySelectorAll('#typeSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === type));
+  const n = Number(amount || 0);
+  const a = $('#amount');
+  a.innerHTML = won(n) + '<small>원</small>';
+  a.className = 'amount' + (n ? (type === 'out' ? ' c-out' : ' c-in') : ' zero');
+  $('#cats').innerHTML = CATS[type].map(([c, i]) =>
+    `<button data-c="${c}" class="${c === cat ? 'on' : ''}"><span>${i}</span>${c}</button>`).join('');
+  const s = $('#save');
+  s.disabled = !n;
+  s.classList.toggle('in', type === 'in');
+  s.textContent = editId ? '수정 저장' : '저장';
+}
+function resetAdd() {
+  amount = ''; editId = null;
+  $('#memo').value = ''; $('#date').value = today();
+  renderAdd();
+}
+
+$('#typeSeg').onclick = e => {
+  const t = e.target.closest('button')?.dataset.t; if (!t) return;
+  type = t; cat = CATS[t][0][0]; renderAdd();
+};
+$('#cats').onclick = e => {
+  const c = e.target.closest('button')?.dataset.c; if (!c) return;
+  cat = c; renderAdd();
+};
+$('#pad').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (navigator.vibrate) navigator.vibrate(8);
+  if (b.dataset.k === 'back') amount = amount.slice(0, -1);
+  else if (amount.length < 11) amount = (amount + b.textContent).replace(/^0+/, '');
+  renderAdd();
+};
+$('#save').onclick = () => {
+  const n = Number(amount); if (!n) return;
+  const rec = { type, amount: n, cat, memo: $('#memo').value.trim(), date: $('#date').value || today() };
+  if (editId) {
+    Object.assign(items.find(x => x.id === editId), rec);
+    toast('수정했어요');
+  } else {
+    items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...rec, ts: Date.now() });
+    toast(`${cat} ${won(n)}원 ${type === 'out' ? '지출' : '수입'} 저장`);
+  }
+  persist();
+  const wasEdit = editId;
+  resetAdd();
+  if (wasEdit) show('list');
+  else if (wideMQ.matches) show(pane);
+};
+
+/* ---------- 내역 ---------- */
+function monthItems() { return items.filter(x => x.date.startsWith(month)); }
+function renderMonthLabel() {
+  const [y, m] = month.split('-');
+  document.querySelectorAll('.mlabel').forEach(h => h.textContent = `${y}년 ${Number(m)}월`);
+}
+function renderList() {
+  renderMonthLabel();
+  const list = monthItems();
+  const out = list.filter(x => x.type === 'out').reduce((s, x) => s + x.amount, 0);
+  const inc = list.filter(x => x.type === 'in').reduce((s, x) => s + x.amount, 0);
+  $('#sum').innerHTML = `
+    <div><label>수입</label><b class="c-in">${won(inc)}</b></div>
+    <div><label>지출</label><b class="c-out">${won(out)}</b></div>
+    <div><label>잔액</label><b>${won(inc - out)}</b></div>`;
+  if (!list.length) { $('#days').innerHTML = '<div class="empty">이번 달 내역이 없어요</div>'; return; }
+  const byDay = {};
+  list.sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts)
+      .forEach(x => (byDay[x.date] ||= []).push(x));
+  const wd = ['일','월','화','수','목','금','토'];
+  $('#days').innerHTML = Object.entries(byDay).map(([d, xs]) => {
+    const dayOut = xs.filter(x => x.type === 'out').reduce((s, x) => s + x.amount, 0);
+    const dt = new Date(d + 'T00:00');
+    return `<div class="day"><h3><span>${dt.getDate()}일 (${wd[dt.getDay()]})</span>${dayOut ? `<span>-${won(dayOut)}</span>` : ''}</h3>
+      <div class="list">${xs.map(x => `
+        <button class="row" data-id="${x.id}">
+          <div class="ic">${icon(x.type, x.cat)}</div>
+          <div class="tx"><div>${x.cat}</div>${x.memo ? `<small>${esc(x.memo)}</small>` : ''}</div>
+          <div class="amt ${x.type === 'out' ? 'c-out' : 'c-in'}">${x.type === 'out' ? '-' : '+'}${won(x.amount)}</div>
+        </button>`).join('')}</div></div>`;
+  }).join('');
+}
+function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+$('#days').onclick = e => {
+  const id = e.target.closest('.row')?.dataset.id; if (!id) return;
+  const x = items.find(i => i.id === id);
+  sheetId = id;
+  $('#sheetTitle').textContent = `${icon(x.type, x.cat)} ${x.cat} ${x.type === 'out' ? '-' : '+'}${won(x.amount)}원`;
+  $('#sheetSub').textContent = x.date + (x.memo ? ' · ' + x.memo : '');
+  $('#sheetBg').classList.add('on');
+};
+$('#sheetBg').onclick = e => { if (e.target.id === 'sheetBg') $('#sheetBg').classList.remove('on'); };
+$('#delBtn').onclick = () => {
+  items = items.filter(x => x.id !== sheetId); persist();
+  $('#sheetBg').classList.remove('on'); renderList(); toast('삭제했어요');
+};
+$('#editBtn').onclick = () => {
+  const x = items.find(i => i.id === sheetId);
+  $('#sheetBg').classList.remove('on');
+  type = x.type; cat = x.cat; amount = String(x.amount); editId = x.id;
+  $('#memo').value = x.memo; $('#date').value = x.date;
+  show('add');
+};
+
+/* ---------- 통계 ---------- */
+function renderStat() {
+  renderMonthLabel();
+  const sums = {};
+  monthItems().filter(x => x.type === 'out').forEach(x => sums[x.cat] = (sums[x.cat] || 0) + x.amount);
+  const rows = Object.entries(sums).sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((s, r) => s + r[1], 0);
+  $('#bars').innerHTML = rows.length ? rows.map(([c, v]) => `
+    <div class="bar"><div class="top"><span>${icon('out', c)} ${c}</span>
+      <span>${won(v)}원 · ${Math.round(v / total * 100)}%</span></div>
+      <div class="track"><div class="fill" style="width:${v / rows[0][1] * 100}%"></div></div></div>`).join('')
+    : '<div class="empty">지출 내역이 없어요</div>';
+}
+
+function download(name, text, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('#exportBtn').onclick = () => download(`가계부_백업_${today()}.json`, JSON.stringify(items), 'application/json');
+$('#csvBtn').onclick = () => {
+  const rows = [['날짜','구분','카테고리','금액','메모']].concat(
+    monthItems().sort((a, b) => a.date.localeCompare(b.date))
+      .map(x => [x.date, x.type === 'out' ? '지출' : '수입', x.cat, x.amount, '"' + x.memo.replace(/"/g, '""') + '"']));
+  download(`가계부_${month}.csv`, '﻿' + rows.map(r => r.join(',')).join('\n'), 'text/csv');
+};
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data)) throw 0;
+    const ids = new Set(items.map(x => x.id));
+    const add = data.filter(x => x && x.id && !ids.has(x.id) && x.amount && x.date);
+    items = items.concat(add); persist(); renderStat();
+    toast(`${add.length}건 불러왔어요`);
+  } catch { toast('백업 파일을 읽을 수 없어요'); }
+  e.target.value = '';
+};
+
+/* ---------- 탭 / 월 이동 ---------- */
+// 펼친 화면에서는 입력이 항상 왼쪽에 있고, 탭은 오른쪽(pane)만 바꿈
+const wideMQ = matchMedia('(min-width: 700px)');
+let pane = 'list';
+function show(v) {
+  if (v !== 'add') pane = v;
+  else if (wideMQ.matches) v = pane;
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  renderAdd();
+  if (v === 'list') renderList();
+  if (v === 'stat') renderStat();
+  $('main').scrollTop = 0; $('#v-' + v).scrollTop = 0;
+}
+$('#nav').onclick = e => { const v = e.target.closest('button')?.dataset.v; if (v) show(v); };
+wideMQ.addEventListener('change', () => show($('.view.on').id.slice(2)));
+document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+  const [y, m] = month.split('-').map(Number);
+  month = ym(new Date(y, m - 1 + Number(b.dataset.m), 1));
+  $('#v-list').classList.contains('on') ? renderList() : renderStat();
+});
+
+// 다른 탭/기기에서 열었다 돌아올 때 날짜를 오늘로 맞춤
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !editId && !amount) $('#date').value = today();
+});
+
+resetAdd();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

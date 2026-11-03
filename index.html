@@ -164,11 +164,9 @@
     <div class="monthbar"><button data-m="-1">‹</button><h2 class="mlabel"></h2><button data-m="1">›</button></div>
     <div class="section-title">카테고리별 지출</div>
     <div class="bars" id="bars"></div>
-    <div class="section-title">폰·컴퓨터 연결</div>
-    <div class="tools" id="acct"><div class="acct-msg">연결 기능 준비 중…</div></div>
     <div class="section-title">백업</div>
     <div class="tools">
-      <button id="exportBtn">📤 백업 파일 저장 (JSON)</button>
+      <button id="exportBtn">📤 백업 파일 저장 (Claude 가계부로 옮길 때)</button>
       <label>📥 백업 파일 불러오기<input type="file" id="importFile" accept=".json,application/json" hidden></label>
       <button id="csvBtn">📄 이번 달 CSV 내보내기</button>
     </div>
@@ -411,7 +409,5 @@ document.addEventListener('visibilitychange', () => {
 
 resetAdd();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-</script>
-<script type="module" src="sync.js"></script>
-</body>
+</script></body>
 </html>

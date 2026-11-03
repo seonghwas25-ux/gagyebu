@@ -91,6 +91,8 @@
   .bar .fill { height: 100%; background: var(--out); border-radius: 5px; }
   .section-title { font-size: 14px; color: var(--sub); margin: 16px 0 8px; font-weight: 600; }
   .tools { display: grid; gap: 8px; }
+  .acct-msg { background: var(--card); border-radius: 12px; padding: 14px; font-size: 14px; color: var(--sub); line-height: 1.5; }
+  .acct-msg b { color: var(--text); }
   .tools button, .tools label { background: var(--card); border-radius: 12px; padding: 14px; text-align: left; font-size: 15px; display: block; }
 
   /* 하단 탭 */
@@ -162,6 +164,8 @@
     <div class="monthbar"><button data-m="-1">‹</button><h2 class="mlabel"></h2><button data-m="1">›</button></div>
     <div class="section-title">카테고리별 지출</div>
     <div class="bars" id="bars"></div>
+    <div class="section-title">폰·컴퓨터 연결</div>
+    <div class="tools" id="acct"><div class="acct-msg">연결 기능 준비 중…</div></div>
     <div class="section-title">백업</div>
     <div class="tools">
       <button id="exportBtn">📤 백업 파일 저장 (JSON)</button>
@@ -207,6 +211,15 @@ function load() {
 function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(items)); }
   catch { toast('저장 공간 오류 — 백업을 해주세요'); }
+}
+// 구글 로그인 중이면 sync.js가 window.cloud를 채워서 클라우드에도 저장
+const cloudPut = xs => window.cloud?.put(xs);
+const cloudDel = id => window.cloud?.del(id);
+window.localItems = () => items;
+window.applyCloud = list => { items = list; persist(); refresh(); };
+function refresh() {
+  if ($('#v-list').classList.contains('on')) renderList();
+  if ($('#v-stat').classList.contains('on')) renderStat();
 }
 function ym(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function today() {
@@ -258,14 +271,16 @@ $('#pad').onclick = e => {
 $('#save').onclick = () => {
   const n = Number(amount); if (!n) return;
   const rec = { type, amount: n, cat, memo: $('#memo').value.trim(), date: $('#date').value || today() };
+  let saved;
   if (editId) {
-    Object.assign(items.find(x => x.id === editId), rec);
+    saved = Object.assign(items.find(x => x.id === editId), rec);
     toast('수정했어요');
   } else {
-    items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...rec, ts: Date.now() });
+    saved = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...rec, ts: Date.now() };
+    items.push(saved);
     toast(`${cat} ${won(n)}원 ${type === 'out' ? '지출' : '수입'} 저장`);
   }
-  persist();
+  persist(); cloudPut([saved]);
   const wasEdit = editId;
   resetAdd();
   if (wasEdit) show('list');
@@ -316,7 +331,7 @@ $('#days').onclick = e => {
 };
 $('#sheetBg').onclick = e => { if (e.target.id === 'sheetBg') $('#sheetBg').classList.remove('on'); };
 $('#delBtn').onclick = () => {
-  items = items.filter(x => x.id !== sheetId); persist();
+  items = items.filter(x => x.id !== sheetId); persist(); cloudDel(sheetId);
   $('#sheetBg').classList.remove('on'); renderList(); toast('삭제했어요');
 };
 $('#editBtn').onclick = () => {
@@ -361,7 +376,7 @@ $('#importFile').onchange = async e => {
     if (!Array.isArray(data)) throw 0;
     const ids = new Set(items.map(x => x.id));
     const add = data.filter(x => x && x.id && !ids.has(x.id) && x.amount && x.date);
-    items = items.concat(add); persist(); renderStat();
+    items = items.concat(add); persist(); cloudPut(add); renderStat();
     toast(`${add.length}건 불러왔어요`);
   } catch { toast('백업 파일을 읽을 수 없어요'); }
   e.target.value = '';
@@ -397,5 +412,6 @@ document.addEventListener('visibilitychange', () => {
 resetAdd();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
+<script type="module" src="sync.js"></script>
 </body>
 </html>
